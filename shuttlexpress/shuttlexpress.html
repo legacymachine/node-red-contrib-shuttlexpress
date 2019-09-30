@@ -1,0 +1,149 @@
+<script type="text/javascript">
+  RED.nodes.registerType("ShuttleXpressConfig", {
+    category: "config",
+    defaults: {
+      vid: {value: "", required: true},
+      pid: {value: "", required: true},
+      name: {value: ""}
+    },
+    label: function() {
+      return this.name || "ShuttleXpressConfig";
+    }
+  });
+</script>
+
+<script type="text/x-red" data-template-name="ShuttleXpressConfig">
+
+  <div class="form-row">
+    <label for="node-config-input-vid"><i class="fa "></i> Vendor ID </label>
+    <input type="text" id="node-config-input-vid" value="0x0B33" placeholder="2867 or 0x0B33">
+  </div>
+
+  <div class="form-row">
+    <label for="node-config-input-pid"><i class="fa "></i> Product ID </label>
+    <input type="text" id="node-config-input-pid" value="0x0020" placeholder="32 or 0x0020">
+  </div>
+
+  <div class="form-row">
+    <label for="node-config-input-name"><i class="fa "></i> Name </label>
+    <input type="text" id="node-config-input-name" placeholder="ShuttleXpress">
+  </div>
+
+</script>
+
+<script type="text/x-red" data-help-name="ShuttleXpressConfig">
+  <p>HID Device Info Details of the ShuttleXpress Device connection</p>
+</script>
+
+
+<script type="text/javascript">
+  RED.nodes.registerType("ShuttleXpress", {
+    category: "ShuttleXpress",
+    color: "#dce0d9",
+    defaults: {
+      connection: {type: "ShuttleXpressConfig", required: true},
+      name: {value: ""}
+    },
+    inputs: 0,
+    outputs: 1,
+    outputLabels: ["ShuttleXpress Commands"],
+    icon: "shuttlexpress.png",
+    label: function() {
+      return this.name || "ShuttleXpress";
+    }
+  });
+</script>
+
+<script type="text/x-red" data-template-name="ShuttleXpress">
+
+  <div class="form-row">
+    <label for="node-input-connection"><i class="fa "></i> Connection </label>
+    <input type="text" id="node-input-connection" placeholder="">
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-name"><i class="icon-tag"></i> Name </label>
+    <input type="text" id="node-input-name" placeholder="Name">
+  </div>
+
+</script>
+
+<script type="text/x-red" data-help-name="ShuttleXpress">
+
+    <p>A node that parses the output Buffer data from a ShuttleXpress device. The output of the parsed Buffer data is an object containing "cmd" and "value". This object is attached to msg.payload and sent to the output. If a device error occurs, it will be handled using node.error() and will hit a Catch node if used.</p>
+
+    <h3>Output</h3>
+        <ol class="node-ports">
+            <li>Standard Output
+                <dl class="message-properties">
+                    <dt>payload<span class="property-type">string</span></dt>
+                    <dd>{cmd: ShuttleXpress Command, value: ShuttleXpress Command Value}</dd>
+                    <br>
+                    <dd>cmd: JOG, value: -7 to 7</dd>
+                    <br>
+                    <dd>cmd: INCREMENT, value: -1 or 1</dd>
+                    <br>
+                    <dd>cmd: BTN_#, value: boolean</dd>
+                </dl>
+            </li>
+        </ol>
+
+    <h3>Details</h3>
+        <p>For the 'JOG' cmd, it will return integer values between -7 and 7 where 0 is the resting state of the jog dial, negative values are CCW and positive values are CW on the jog dial.</p>
+        <br>
+        <p>For the 'INCREMENT' cmd, it will return either -1 or +1 to reflect CCW (negative) or CW (positive) direction of the increment dial.</p>
+        <br>
+        <p>For the 'BTN_1 through BTN_5' cmd, it will return true for button pressed and false for button released.</p>
+
+</script>
+
+
+<script type="text/javascript">
+  RED.nodes.registerType("DeviceInfo", {
+    category: "ShuttleXpress",
+    color: "#dce0d9",
+    defaults: {
+      name: {value: ""}            
+    },
+    button: {
+        onclick: function() {
+            const node = this;
+            $.ajax({
+                url: "inject/"+this.id,
+                type:"POST",
+                success: function(resp) {
+                    RED.notify(node._("inject.success",{label:label}),{type:"success",id:"inject"});
+                },
+                error: function(jqXHR,textStatus,errorThrown) {
+                    if (jqXHR.status == 404) {
+                        RED.notify(node._("common.notification.error",{message:node._("common.notification.errors.not-deployed")}),"error");
+                    } else if (jqXHR.status == 500) {
+                        RED.notify(node._("common.notification.error",{message:node._("inject.errors.failed")}),"error");
+                    } else if (jqXHR.status == 0) {
+                        RED.notify(node._("common.notification.error",{message:node._("common.notification.errors.no-response")}),"error");
+                    } else {
+                        RED.notify(node._("common.notification.error",{message:node._("common.notification.errors.unexpected",{status:jqXHR.status,message:textStatus})}),"error");
+                    }
+                }
+            });
+        }
+    },
+    inputs: 0,
+    outputs: 1,
+    icon: "shuttlexpress.png",
+    label: function() {
+      return this.name || "DeviceInfo";
+    }
+  });
+</script>
+
+<script type="text/x-red" data-template-name="DeviceInfo">
+  <div class="form-row">
+    <label for="node-input-name"><i class="icon-tag"></i> Name </label>
+    <input type="text" id="node-input-name" placeholder="Name">
+  </div>
+</script>
+
+<script type="text/x-red" data-help-name="DeviceInfo">
+  <p>A node that lists the connected ShuttleXpress HID Device Info and returns it as msg.payload</p>
+</script>
