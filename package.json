@@ -2,6 +2,10 @@
   "name": "node-red-contrib-shuttlexpress",
   "version": "0.0.1",
   "description": "Node-RED nodes for the ShuttleXpress input device, built around node-hid",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/legacymachine/node-red-contrib-shuttlexpress.git"
+  },
   "keywords": [
     "node-red",
     "shuttlexpress",
@@ -13,10 +17,10 @@
   ],
   "author": "Josh Dudley <jadudley03@gmail.com>",
   "license": "MIT License",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/dudleyjosh/node-red-contrib-shuttlexpress.git"
+  "bugs": {
+    "url": "https://github.com/legacymachine/node-red-contrib-shuttlexpress/issues"
   },
+  "homepage": "https://github.com/legacymachine/node-red-contrib-shuttlexpress#readme",
   "dependencies": {
     "node-hid": "^0.7.9"
   },
