@@ -22,7 +22,7 @@
   },
   "homepage": "https://github.com/legacymachine/node-red-contrib-shuttlexpress#readme",
   "dependencies": {
-    "node-hid": "^0.7.9"
+    "node-hid": "^2.1.1"
   },
   "node-red": {
     "nodes": {

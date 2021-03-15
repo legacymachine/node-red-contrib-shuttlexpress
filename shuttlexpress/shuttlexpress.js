@@ -12,7 +12,15 @@ module.exports = function(RED) {
 
         RED.nodes.createNode(this, config);
 
-        this.server = RED.nodes.getNode(config.connection);
+        this.connection = RED.nodes.getNode(config.connection);
+
+        this.log("I am here!");
+
+        if (this.connection) {
+            
+        } else {
+            this.log("No Connection");
+        }
 
         let device = null;
 
@@ -20,7 +28,7 @@ module.exports = function(RED) {
 
         try {
 
-            device = new HID.HID(this.server.vid, this.server.pid);
+            device = new HID.HID(Number(this.connection.vid), Number(this.connection.pid));
 
             this.status({
                 fill: "green",
@@ -29,6 +37,8 @@ module.exports = function(RED) {
             });
 
         } catch (err) {
+
+            this.error(err);
 
             this.status({
                 fill: "red",
@@ -69,7 +79,10 @@ module.exports = function(RED) {
 
         const node = this;
 
-        this.on("input", function(msg) {
+        this.on("input", function(msg, send, done) {
+            
+            // For backwards compatibility with Node-RED 0.x
+            send = send || function() {node.send.apply(node,arguments);};
 
             const devices = HID.devices();
 
@@ -79,7 +92,12 @@ module.exports = function(RED) {
             });
 
             msg.payload = deviceInfo;
-            node.send(msg);
+            send(msg);
+
+            // For backwards compatibility with Node-RED 0.x
+            if (done) {
+                done();
+            }
 
         });
 

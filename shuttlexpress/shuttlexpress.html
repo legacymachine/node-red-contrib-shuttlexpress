@@ -12,7 +12,7 @@
   });
 </script>
 
-<script type="text/x-red" data-template-name="ShuttleXpressConfig">
+<script type="text/html" data-template-name="ShuttleXpressConfig">
 
   <div class="form-row">
     <label for="node-config-input-vid"><i class="fa "></i> Vendor ID </label>
@@ -31,7 +31,7 @@
 
 </script>
 
-<script type="text/x-red" data-help-name="ShuttleXpressConfig">
+<script type="text/html" data-help-name="ShuttleXpressConfig">
   <p>HID Device Info Details of the ShuttleXpress Device connection</p>
 </script>
 
@@ -54,7 +54,7 @@
   });
 </script>
 
-<script type="text/x-red" data-template-name="ShuttleXpress">
+<script type="text/html" data-template-name="ShuttleXpress">
 
   <div class="form-row">
     <label for="node-input-connection"><i class="fa "></i> Connection </label>
@@ -68,7 +68,7 @@
 
 </script>
 
-<script type="text/x-red" data-help-name="ShuttleXpress">
+<script type="text/html" data-help-name="ShuttleXpress">
 
     <p>A node that parses the output Buffer data from a ShuttleXpress device. The output of the parsed Buffer data is an object containing "cmd" and "value". This object is attached to msg.payload and sent to the output. If a device error occurs, it will be handled using node.error() and will hit a Catch node if used.</p>
 
@@ -137,13 +137,13 @@
   });
 </script>
 
-<script type="text/x-red" data-template-name="DeviceInfo">
+<script type="text/html" data-template-name="DeviceInfo">
   <div class="form-row">
     <label for="node-input-name"><i class="icon-tag"></i> Name </label>
     <input type="text" id="node-input-name" placeholder="Name">
   </div>
 </script>
 
-<script type="text/x-red" data-help-name="DeviceInfo">
+<script type="text/html" data-help-name="DeviceInfo">
   <p>A node that lists the connected ShuttleXpress HID Device Info and returns it as msg.payload</p>
 </script>
