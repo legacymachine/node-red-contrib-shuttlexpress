@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-shuttlexpress",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Node-RED nodes for the ShuttleXpress input device, built around node-hid",
   "repository": {
     "type": "git",
@@ -22,7 +22,7 @@
   },
   "homepage": "https://github.com/legacymachine/node-red-contrib-shuttlexpress#readme",
   "dependencies": {
-    "node-hid": "^2.1.1"
+    "node-hid": "^2.1.2"
   },
   "node-red": {
     "nodes": {
