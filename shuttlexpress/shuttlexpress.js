@@ -1,6 +1,7 @@
 module.exports = function(RED) {
 
     const HID = require("node-hid");
+    const usbDetect = require("usb-detection");
 
     function ShuttleXpressConfigNode(n) {
         RED.nodes.createNode(this, n);
@@ -10,64 +11,102 @@ module.exports = function(RED) {
 
     function ShuttleXpressNode(config) {
 
+        //console.log("config:", config);
+
         RED.nodes.createNode(this, config);
 
-        this.connection = RED.nodes.getNode(config.connection);
+        const node = this;
 
-        this.log("I am here!");
+        node.connection = RED.nodes.getNode(config.connection);
+        //console.log("connection:", node.connection);
 
-        if (this.connection) {
-            
-        } else {
-            this.log("No Connection");
-        }
+        const VID = Number(node.connection.vid);
+        const PID = Number(node.connection.pid);
 
-        let device = null;
+        let shuttleXpress = null;
 
-        let shuttlePrev = Buffer.alloc(5).toJSON().data;
+        // Start Monitoring USB devies for detection
+        usbDetect.startMonitoring();
 
-        try {
+        usbDetect.find(VID, PID, function(err, devices) { 
+            //console.log(`find:${VID}:${PID}`, devices, err);
+            const device = devices.find(device => (device.vendorId === VID && device.productId === PID));
+            //console.log("device:", device);
+            if (device) usbDetect.emit(`add:${VID}:${PID}`, device);
+        });
 
-            device = new HID.HID(Number(this.connection.vid), Number(this.connection.pid));
+        usbDetect.on(`add:${VID}:${PID}`, function(device) {
 
-            this.status({
-                fill: "green",
-                shape: "dot",
-                text: "connected"
+            //console.log(`add:${VID}:${PID}`, device);
+
+            let shuttlePrev = Buffer.alloc(5).toJSON().data;
+
+            try {
+
+                shuttleXpress = new HID.HID(VID, PID);
+
+                shuttleXpress.on("data", function(data) {
+
+                    // data is a Buffer
+
+                    const shuttleData = data.toJSON().data;
+
+                    const shuttle = parseShuttleData(shuttleData, shuttlePrev);
+
+                    if (shuttle !== null) {
+                        shuttlePrev = shuttle.shuttlePrev;
+
+                        shuttle.shuttleStatus.data = data;
+                        console.log("shuttleStatus:", shuttle.shuttleStatus);
+        
+                        const msg = {payload: shuttle.shuttleStatus};
+                        node.send(msg);
+                    }
+        
+                });
+        
+                shuttleXpress.on("error", function(err) {
+                    const msg = {payload: ""};
+                    node.error(`ShuttleXpress Device Error: ${err}`, msg);
+                });
+
+                node.status({
+                    fill: "green",
+                    shape: "dot",
+                    text: "connected"
+                });
+
+            } catch (err) {
+
+                node.error(err);
+
+                node.status({
+                    fill: "red",
+                    shape: "ring",
+                    text: "disconnected"
+                });
+
+            }
+
+            node.on("close", function() {
+                shuttleXpress.close();
             });
 
-        } catch (err) {
+        });
 
-            this.error(err);
+        usbDetect.on(`remove:${VID}:${PID}`, function(device) {
 
-            this.status({
+            //console.log(`remove:${VID}:${PID}`, device);
+
+            shuttleXpress.close();
+            shuttleXpress = null;
+
+            node.status({
                 fill: "red",
                 shape: "ring",
                 text: "disconnected"
             });
 
-        }
-
-        const node = this;
-
-        device.on("data", function(data) {
-
-            const shuttleData = parseShuttleData(data, shuttlePrev);
-            shuttlePrev = shuttleData.shuttlePrev;
-            const shuttleStatus = shuttleData.shuttleStatus;
-
-            const msg = {payload: shuttleStatus};
-            node.send(msg);
-
-        });
-
-        device.on("error", function(err) {
-            const msg = {payload: ""};
-            node.error(`ShuttleXpress Device Error: ${err}`, msg);
-        });
-
-        this.on("close", function() {
-            device.close();
         });
 
     }
@@ -79,7 +118,7 @@ module.exports = function(RED) {
 
         const node = this;
 
-        this.on("input", function(msg, send, done) {
+        node.on("input", function(msg, send, done) {
             
             // For backwards compatibility with Node-RED 0.x
             send = send || function() {node.send.apply(node,arguments);};
@@ -87,7 +126,7 @@ module.exports = function(RED) {
             const devices = HID.devices();
 
             const deviceInfo = devices.find( function(d) {
-                var isShuttleXpress = d.product==="ShuttleXpress";
+                const isShuttleXpress = (d.product === "ShuttleXpress");
                 return isShuttleXpress;
             });
 
@@ -105,72 +144,72 @@ module.exports = function(RED) {
 
 
     // Helper Functions
-    function parseShuttleData(buffer, shuttlePrev) {
+    function parseShuttleData(shuttleData, shuttlePrev) {
 
-        const shuttle = buffer.toJSON().data;
+        let shuttleStatus = null;
 
-        if (shuttle[0] !== shuttlePrev[0]) {
+        // Buffer Construct: <00 00 00 00 00>
+        //                   <JOG INCREMENTS 00 BTN_1-BTN_4 BTN_5>
 
-            //console.log(`shuttle[0]: ${shuttle[0]}, shuttlePrev[0]: ${shuttlePrev[0]}`);
+        //console.log("shuttleCurr:", shuttleData);
+        //console.log("shuttlePrev:", shuttlePrev);
 
-            if (shuttle[0] >= 0 && shuttle[0] <= 7)  shuttleStatus = {cmd: "JOG", value: shuttle[0]};
-            if (shuttle[0] >= 249 && shuttle[0] <= 255)  shuttleStatus = {cmd: "JOG", value: (255 - (shuttle[0] - 1)) * -1};
+        // Shuttle JOG Dial State
+        if (shuttleData[0] !== shuttlePrev[0]) {
+            if (shuttleData[0] >= 0x00 && shuttleData[0] <= 0x07)  shuttleStatus = {cmd: "JOG", value: shuttleData[0]};
+            if (shuttleData[0] >= 0xF9 && shuttleData[0] <= 0xFF)  shuttleStatus = {cmd: "JOG", value: -(0xFF - (shuttleData[0] - 1))};
+        }
 
-            shuttlePrev[0] = shuttle[0]; // Store Previous Jog State
-            shuttlePrev[1] = shuttle[1]; // Read & Store Current Increment State
-
-        } else if (shuttle[3] !== shuttlePrev[3]) {
-
-            //console.log(`shuttle[3]: ${shuttle[3]}, shuttlePrev[3]: ${shuttlePrev[3]}`);
-
-            if (shuttle[3] === 16) shuttleStatus = {cmd: "BTN_1", value: true};
-            if (shuttlePrev[3] === 16) shuttleStatus = {cmd: "BTN_1", value: false};
-
-            if (shuttle[3] === 32) shuttleStatus = {cmd: "BTN_2", value: true};
-            if (shuttlePrev[3] === 32) shuttleStatus = {cmd: "BTN_2", value: false};
-
-            if (shuttle[3] === 64) shuttleStatus = {cmd: "BTN_3", value: true};
-            if (shuttlePrev[3] === 64) shuttleStatus = {cmd: "BTN_3", value: false};
-
-            if (shuttle[3] === 128) shuttleStatus = {cmd: "BTN_4", value: true};
-            if (shuttlePrev[3] === 128) shuttleStatus = {cmd: "BTN_4", value: false};
-
-            shuttlePrev[3] = shuttle[3]; // Store Previous State
-            shuttlePrev[1] = shuttle[1]; // Read & Store Current Increment State
-
-        } else if (shuttle[4] !== shuttlePrev[4]) {
-
-            //console.log(`shuttle[4]: ${shuttle[4]}, shuttlePrev[4]: ${shuttlePrev[4]}`);
-
-            if (shuttle[4] === 1) shuttleStatus = {cmd: "BTN_5", value: true};
-            if (shuttlePrev[4] === 1) shuttleStatus = {cmd: "BTN_5", value: false};
-
-            shuttlePrev[4] = shuttle[4]; // Store Previous Btn State
-            shuttlePrev[1] = shuttle[1]; // Read & Store Current Increment State
-
-        } else {
-
-            if (shuttle[1] !== shuttlePrev[1]) {
-
-                if (shuttlePrev[1] === 255 && shuttle[1] === 0) {
-                    shuttleStatus = {cmd: "INCREMENT", value: +1};
-                } else if (shuttlePrev[1] === 0 && shuttle[1] === 255) {
-                    shuttleStatus = {cmd: "INCREMENT", value: -1};
-                } else if (shuttle[1] > shuttlePrev[1]) {
-                    shuttleStatus = {cmd: "INCREMENT", value: +1};
-                } else {
-                    shuttleStatus = {cmd: "INCREMENT", value: -1};
-                }
-
-                shuttlePrev[1] = shuttle[1]; // Store Previous Increement State
-
+        // Shuttle INCREMENT Dial State
+        if (shuttleData[1] !== shuttlePrev[1]) {
+            if (shuttlePrev[1] === 0xFF && shuttleData[1] === 0x00) {
+                shuttleStatus = {cmd: "INCREMENT", value: +1};
+            } else if (shuttlePrev[1] === 0x00 && shuttleData[1] === 0xFF) {
+                shuttleStatus = {cmd: "INCREMENT", value: -1};
+            } else if (shuttleData[1] > shuttlePrev[1]) {
+                shuttleStatus = {cmd: "INCREMENT", value: +1};
+            } else {
+                shuttleStatus = {cmd: "INCREMENT", value: -1};
             }
+        }
+
+        // Shuttle BTN_1 thru BTN_4 State
+        if (shuttleData[3] !== shuttlePrev[3]) {
+
+            if (shuttleData[3] === 0x10) shuttleStatus = {cmd: "BTN_1", value: true};
+            if (shuttlePrev[3] === 0x10) shuttleStatus = {cmd: "BTN_1", value: false};
+
+            if (shuttleData[3] === 0x20) shuttleStatus = {cmd: "BTN_2", value: true};
+            if (shuttlePrev[3] === 0x20) shuttleStatus = {cmd: "BTN_2", value: false};
+
+            if (shuttleData[3] === 0x40) shuttleStatus = {cmd: "BTN_3", value: true};
+            if (shuttlePrev[3] === 0x40) shuttleStatus = {cmd: "BTN_3", value: false};
+
+            if (shuttleData[3] === 0x80) shuttleStatus = {cmd: "BTN_4", value: true};
+            if (shuttlePrev[3] === 0x80) shuttleStatus = {cmd: "BTN_4", value: false};
 
         }
 
-        //console.log(`INPUT: ${shuttleStatus.input}, VALUE: ${shuttleStatus.value}`);
-        return {shuttleStatus: shuttleStatus, shuttlePrev: shuttlePrev};
-        
+        // Shuttle BTN_5 State
+        if (shuttleData[4] !== shuttlePrev[4]) {
+            if (shuttleData[4] === 0x01) shuttleStatus = {cmd: "BTN_5", value: true};
+            if (shuttlePrev[4] === 0x01) shuttleStatus = {cmd: "BTN_5", value: false};
+        }
+
+        if (shuttleStatus === null) {
+            return null;
+        } else if (typeof shuttleStatus === "object") {
+            if ("cmd" in shuttleStatus && "value" in shuttleStatus) {
+                // Store Previous Shuttle State
+                shuttlePrev = shuttleData;
+                return {shuttleStatus: shuttleStatus, shuttlePrev: shuttlePrev};
+            } else {
+                return null;
+            }
+        } else {
+            return null;
+        }
+
     }
 
 

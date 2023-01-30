@@ -22,7 +22,8 @@
   },
   "homepage": "https://github.com/legacymachine/node-red-contrib-shuttlexpress#readme",
   "dependencies": {
-    "node-hid": "^2.1.2"
+    "node-hid": "^2.1.2",
+    "usb-detection": "^4.14.1"
   },
   "node-red": {
     "nodes": {
