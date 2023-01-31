@@ -29,7 +29,6 @@ module.exports = function(RED) {
         usbDetect.startMonitoring();
 
         usbDetect.find(VID, PID, function(err, devices) { 
-            //console.log(`find:${VID}:${PID}`, devices, err);
             const device = devices.find(device => (device.vendorId === VID && device.productId === PID));
             //console.log("device:", device);
             if (device) usbDetect.emit(`add:${VID}:${PID}`, device);
@@ -37,7 +36,7 @@ module.exports = function(RED) {
 
         usbDetect.on(`add:${VID}:${PID}`, function(device) {
 
-            //console.log(`add:${VID}:${PID}`, device);
+            //node.warn({payload: device, topic: "USB-HID connected to Node-RED"});
 
             let shuttlePrev = Buffer.alloc(5).toJSON().data;
 
@@ -66,8 +65,8 @@ module.exports = function(RED) {
                 });
         
                 shuttleXpress.on("error", function(err) {
-                    const msg = {payload: ""};
-                    node.error(`ShuttleXpress Device Error: ${err}`, msg);
+                    const msg = {payload: "ShuttleXpress Device Error"};
+                    node.error(err, msg);
                 });
 
                 node.status({
@@ -88,17 +87,12 @@ module.exports = function(RED) {
 
             }
 
-            node.on("close", function() {
-                shuttleXpress.close();
-            });
-
         });
 
         usbDetect.on(`remove:${VID}:${PID}`, function(device) {
 
-            //console.log(`remove:${VID}:${PID}`, device);
+            //node.warn({payload: device, topic: "USB-HID disconnected from Node-RED"});
 
-            shuttleXpress.close();
             shuttleXpress = null;
 
             node.status({
