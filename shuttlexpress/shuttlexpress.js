@@ -3,97 +3,26 @@ module.exports = function(RED) {
     const HID = require("node-hid");
     const usbDetect = require("usb-detection");
 
-    function ShuttleXpressConfigNode(n) {
-        RED.nodes.createNode(this, n);
-        this.vid = n.vid;
-        this.pid = n.pid;
-    }
-
     function ShuttleXpressNode(config) {
-
-        //console.log("config:", config);
 
         RED.nodes.createNode(this, config);
 
         const node = this;
 
-        node.connection = RED.nodes.getNode(config.connection);
-        //console.log("connection:", node.connection);
-
-        const VID = Number(node.connection.vid);
-        const PID = Number(node.connection.pid);
-
-        let shuttleXpress = null;
+        // vendorID and productID for Contour Design ShuttleXpress device
+        const VID = 0x0b33; // 2867
+        const PID = 0x0020; // 32
 
         // Start Monitoring USB devies for detection
         usbDetect.startMonitoring();
 
-        usbDetect.find(VID, PID, function(err, devices) { 
-            const device = devices.find(device => (device.vendorId === VID && device.productId === PID));
-            //console.log("device:", device);
-            if (device) usbDetect.emit(`add:${VID}:${PID}`, device);
-        });
-
         usbDetect.on(`add:${VID}:${PID}`, function(device) {
-
-            //node.warn({payload: device, topic: "USB-HID connected to Node-RED"});
-
-            let shuttlePrev = Buffer.alloc(5).toJSON().data;
-
-            try {
-
-                shuttleXpress = new HID.HID(VID, PID);
-
-                shuttleXpress.on("data", function(data) {
-
-                    // data is a Buffer
-
-                    const shuttleData = data.toJSON().data;
-
-                    const shuttle = parseShuttleData(shuttleData, shuttlePrev);
-
-                    if (shuttle !== null) {
-                        shuttlePrev = shuttle.shuttlePrev;
-
-                        shuttle.shuttleStatus.data = data;
-                        console.log("shuttleStatus:", shuttle.shuttleStatus);
-        
-                        const msg = {payload: shuttle.shuttleStatus};
-                        node.send(msg);
-                    }
-        
-                });
-        
-                shuttleXpress.on("error", function(err) {
-                    const msg = {payload: "ShuttleXpress Device Error"};
-                    node.error(err, msg);
-                });
-
-                node.status({
-                    fill: "green",
-                    shape: "dot",
-                    text: "connected"
-                });
-
-            } catch (err) {
-
-                node.error(err);
-
-                node.status({
-                    fill: "red",
-                    shape: "ring",
-                    text: "disconnected"
-                });
-
-            }
-
+            connectShuttleXpress(node, VID, PID);
         });
 
         usbDetect.on(`remove:${VID}:${PID}`, function(device) {
 
-            //node.warn({payload: device, topic: "USB-HID disconnected from Node-RED"});
-
-            shuttleXpress = null;
+            node.log("ShuttleXpress node-hid device disconnected from Node-RED");
 
             node.status({
                 fill: "red",
@@ -103,100 +32,155 @@ module.exports = function(RED) {
 
         });
 
-    }
-
-    // Get ShuttleXpress Device Info
-    function ShuttleXpressDeviceInfoNode(config) {
-
-        RED.nodes.createNode(this, config);
-
-        const node = this;
-
-        node.on("input", function(msg, send, done) {
-            
-            // For backwards compatibility with Node-RED 0.x
-            send = send || function() {node.send.apply(node,arguments);};
-
-            const devices = HID.devices();
-
-            const deviceInfo = devices.find( function(d) {
-                const isShuttleXpress = (d.product === "ShuttleXpress");
-                return isShuttleXpress;
-            });
-
-            msg.payload = deviceInfo;
-            send(msg);
-
-            // For backwards compatibility with Node-RED 0.x
-            if (done) {
-                done();
+        usbDetect.find(VID, PID, function(err, devices) { 
+            const device = devices.find(device => (device.vendorId === VID && device.productId === PID));
+            if (device) {
+                usbDetect.emit(`add:${VID}:${PID}`, device);
+            } else {
+                node.log("ShuttleXpress node-hid device not found");
+                node.status({
+                    fill: "red",
+                    shape: "ring",
+                    text: "disconnected"
+                });
             }
-
         });
 
     }
 
 
-    // Helper Functions
-    function parseShuttleData(shuttleData, shuttlePrev) {
+    function connectShuttleXpress(node, VID, PID) {
 
-        let shuttleStatus = null;
+        try {
 
-        // Buffer Construct: <00 00 00 00 00>
-        //                   <JOG INCREMENTS 00 BTN_1-BTN_4 BTN_5>
+            const shuttleXpress = new HID.HID(VID, PID);
 
-        //console.log("shuttleCurr:", shuttleData);
-        //console.log("shuttlePrev:", shuttlePrev);
+            let dataPrevious = Buffer.alloc(5).toJSON().data;
 
-        // Shuttle JOG Dial State
-        if (shuttleData[0] !== shuttlePrev[0]) {
-            if (shuttleData[0] >= 0x00 && shuttleData[0] <= 0x07)  shuttleStatus = {cmd: "JOG", value: shuttleData[0]};
-            if (shuttleData[0] >= 0xF9 && shuttleData[0] <= 0xFF)  shuttleStatus = {cmd: "JOG", value: -(0xFF - (shuttleData[0] - 1))};
+            shuttleXpress.on("data", function(data) {
+
+                // 'data' is a Buffer
+                // Buffer Construct: <00 00 00 00 00>
+                // <JOG MPG 00 BTN_1-BTN_4 BTN_5>
+
+                const dataCurrent = data.toJSON().data;
+
+                const shuttle = parseShuttleData(dataCurrent, dataPrevious);
+
+                if (shuttle !== null) {
+
+                    dataPrevious = shuttle.dataPrevious;
+
+                    // add the raw buffer to the return object
+                    shuttle.status.buffer = data;
+                    //console.log("status:", shuttle.status);
+    
+                    const msg = {payload: shuttle.status};
+                    node.send(msg);
+
+                }
+    
+            });
+    
+            shuttleXpress.on("error", function(err) {
+                const msg = {payload: "ShuttleXpress Device Error"};
+                node.error(err, msg);
+            });
+
+            node.log("ShuttleXpress node-hid device connected to Node-RED");
+
+            node.status({
+                fill: "green",
+                shape: "dot",
+                text: "connected"
+            });
+
+        } catch (err) {
+
+            node.error(err);
+
+            node.log("ShuttleXpress node-hid device failed to connect to Node-RED");
+
+            node.status({
+                fill: "red",
+                shape: "ring",
+                text: "disconnected"
+            });
+
         }
 
-        // Shuttle INCREMENT Dial State
-        if (shuttleData[1] !== shuttlePrev[1]) {
-            if (shuttlePrev[1] === 0xFF && shuttleData[1] === 0x00) {
-                shuttleStatus = {cmd: "INCREMENT", value: +1};
-            } else if (shuttlePrev[1] === 0x00 && shuttleData[1] === 0xFF) {
-                shuttleStatus = {cmd: "INCREMENT", value: -1};
-            } else if (shuttleData[1] > shuttlePrev[1]) {
-                shuttleStatus = {cmd: "INCREMENT", value: +1};
+    };
+
+    // Helper Functions
+    function parseShuttleData(dataCurrent, dataPrevious) {
+
+        let status = null;
+
+        // Shuttle JOG Dial State
+        if (dataCurrent[0] !== dataPrevious[0]) {
+            if (dataCurrent[0] >= 0x00 && dataCurrent[0] <= 0x07) {
+                status = {cmd: "JOG", value: dataCurrent[0]};
+            } else if (dataCurrent[0] >= 0xF9 && dataCurrent[0] <= 0xFF) {
+                status = {cmd: "JOG", value: -(0xFF - (dataCurrent[0] - 1))};
             } else {
-                shuttleStatus = {cmd: "INCREMENT", value: -1};
+                return null;
+            }
+        }
+
+        // Shuttle MPG Dial State
+        if (dataCurrent[1] !== dataPrevious[1]) {
+            if (dataPrevious[1] === 0xFF && dataCurrent[1] === 0x00) {
+                status = {cmd: "MPG", value: +1};
+            } else if (dataPrevious[1] === 0x00 && dataCurrent[1] === 0xFF) {
+                status = {cmd: "MPG", value: -1};
+            } else if (dataCurrent[1] > dataPrevious[1]) {
+                status = {cmd: "MPG", value: +1};
+            } else {
+                status = {cmd: "MPG", value: -1};
             }
         }
 
         // Shuttle BTN_1 thru BTN_4 State
-        if (shuttleData[3] !== shuttlePrev[3]) {
-
-            if (shuttleData[3] === 0x10) shuttleStatus = {cmd: "BTN_1", value: true};
-            if (shuttlePrev[3] === 0x10) shuttleStatus = {cmd: "BTN_1", value: false};
-
-            if (shuttleData[3] === 0x20) shuttleStatus = {cmd: "BTN_2", value: true};
-            if (shuttlePrev[3] === 0x20) shuttleStatus = {cmd: "BTN_2", value: false};
-
-            if (shuttleData[3] === 0x40) shuttleStatus = {cmd: "BTN_3", value: true};
-            if (shuttlePrev[3] === 0x40) shuttleStatus = {cmd: "BTN_3", value: false};
-
-            if (shuttleData[3] === 0x80) shuttleStatus = {cmd: "BTN_4", value: true};
-            if (shuttlePrev[3] === 0x80) shuttleStatus = {cmd: "BTN_4", value: false};
-
+        if (dataCurrent[3] !== dataPrevious[3]) {
+            if (dataCurrent[3] === 0x10) {
+                status = {cmd: "BTN_1", value: true};
+            } else if (dataPrevious[3] === 0x10) {
+                status = {cmd: "BTN_1", value: false};
+            } else if (dataCurrent[3] === 0x20) {
+                status = {cmd: "BTN_2", value: true};
+            } else if (dataPrevious[3] === 0x20) {
+                status = {cmd: "BTN_2", value: false};
+            } else if (dataCurrent[3] === 0x40) {
+                status = {cmd: "BTN_3", value: true};
+            } else if (dataPrevious[3] === 0x40) {
+                status = {cmd: "BTN_3", value: false};
+            } else if (dataCurrent[3] === 0x80) {
+                status = {cmd: "BTN_4", value: true};
+            } else if (dataPrevious[3] === 0x80) {
+                status = {cmd: "BTN_4", value: false};
+            } else {
+                return null;
+            }
         }
 
         // Shuttle BTN_5 State
-        if (shuttleData[4] !== shuttlePrev[4]) {
-            if (shuttleData[4] === 0x01) shuttleStatus = {cmd: "BTN_5", value: true};
-            if (shuttlePrev[4] === 0x01) shuttleStatus = {cmd: "BTN_5", value: false};
+        if (dataCurrent[4] !== dataPrevious[4]) {
+            if (dataCurrent[4] === 0x01) {
+                status = {cmd: "BTN_5", value: true};
+            } else if (dataPrevious[4] === 0x01) {
+                status = {cmd: "BTN_5", value: false};
+            } else {
+                return null;
+            }
         }
 
-        if (shuttleStatus === null) {
+        if (status === null) {
             return null;
-        } else if (typeof shuttleStatus === "object") {
-            if ("cmd" in shuttleStatus && "value" in shuttleStatus) {
+        } else if (typeof status === "object") {
+            if ("cmd" in status && "value" in status) {
                 // Store Previous Shuttle State
-                shuttlePrev = shuttleData;
-                return {shuttleStatus: shuttleStatus, shuttlePrev: shuttlePrev};
+                dataPrevious = dataCurrent;
+                return {status: status, dataPrevious: dataPrevious};
             } else {
                 return null;
             }
@@ -204,12 +188,9 @@ module.exports = function(RED) {
             return null;
         }
 
-    }
-
+    };
 
     // Register Nodes
-    RED.nodes.registerType("ShuttleXpressConfig", ShuttleXpressConfigNode);
-    RED.nodes.registerType("DeviceInfo", ShuttleXpressDeviceInfoNode);
     RED.nodes.registerType("ShuttleXpress", ShuttleXpressNode);
 
 };

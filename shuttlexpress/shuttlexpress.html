@@ -1,52 +1,13 @@
 <script type="text/javascript">
-  RED.nodes.registerType("ShuttleXpressConfig", {
-    category: "config",
-    defaults: {
-      vid: {value: 0x0B33, required: true},
-      pid: {value: 0x0020, required: true},
-      name: {value: ""}
-    },
-    label: function() {
-      return this.name || "ShuttleXpress";
-    }
-  });
-</script>
-
-<script type="text/html" data-template-name="ShuttleXpressConfig">
-
-  <div class="form-row">
-    <label for="node-config-input-vid"><i class="fa fa-at"></i> Vendor ID </label>
-    <input type="text" id="node-config-input-vid" value="0x0B33" placeholder="0x0B33 or 2867">
-  </div>
-
-  <div class="form-row">
-    <label for="node-config-input-pid"><i class="fa fa-at"></i> Product ID </label>
-    <input type="text" id="node-config-input-pid" value="0x0020" placeholder="0x0020 or 32">
-  </div>
-
-  <div class="form-row">
-    <label for="node-config-input-name"><i class="fa fa-tag"></i> Name </label>
-    <input type="text" id="node-config-input-name" placeholder="ShuttleXpress">
-  </div>
-
-</script>
-
-<script type="text/html" data-help-name="ShuttleXpressConfig">
-  <p>HID Device Info Details of the ShuttleXpress Device connection</p>
-</script>
-
-
-<script type="text/javascript">
   RED.nodes.registerType("ShuttleXpress", {
     category: "ShuttleXpress",
     color: "#dce0d9",
     defaults: {
-      connection: {type: "ShuttleXpressConfig", required: true},
       name: {value: ""}
     },
     inputs: 0,
     outputs: 1,
-    outputLabels: ["ShuttleXpress Commands"],
+    outputLabels: ["ShuttleXpress Status"],
     icon: "shuttlexpress.png",
     label: function() {
       return this.name || "ShuttleXpress";
@@ -57,11 +18,6 @@
 <script type="text/html" data-template-name="ShuttleXpress">
 
   <div class="form-row">
-    <label for="node-input-connection"><i class="fa fa-usb"></i> Device </label>
-    <input type="text" id="node-input-connection" placeholder="">
-  </div>
-
-  <div class="form-row">
     <label for="node-input-name"><i class="fa fa-tag"></i> Name </label>
     <input type="text" id="node-input-name" placeholder="Name">
   </div>
@@ -70,80 +26,28 @@
 
 <script type="text/html" data-help-name="ShuttleXpress">
 
-    <p>A node that parses the output Buffer data from a ShuttleXpress device. The output of the parsed Buffer data is an object containing "cmd" and "value". This object is attached to msg.payload and sent to the output. If a device error occurs, it will be handled using node.error() and will hit a Catch node if used.</p>
+    <p>This node parses the output buffer data from a Contour Design ShuttleXpress device. The parsed buffer data is output to msg.payload as an object containing "cmd", "value" and "buffer" properties. The "buffer" property is the raw buffer from the ShuttleXpress device that can be easily parsed using the <a href="https://flows.nodered.org/node/node-red-contrib-buffer-parser">node-red-contrib-buffer-parser</a> node. If a device error occurs, it will be handled using node.error().</p>
 
     <h3>Output</h3>
         <ol class="node-ports">
             <li>Standard Output
                 <dl class="message-properties">
-                    <dt>payload<span class="property-type">string</span></dt>
-                    <dd>{cmd: ShuttleXpress Command, value: ShuttleXpress Command Value}</dd>
+                    <dt>payload<span class="property-type">object</span></dt>
                     <br>
-                    <dd>cmd: JOG, value: -7 to 7</dd>
+                    <dd>{cmd: BTN_#, value: boolean, buffer: &lt;00 00 00 20 01&gt;}</dd>
                     <br>
-                    <dd>cmd: INCREMENT, value: -1 or 1</dd>
+                    <dd>{cmd: MPG, value: -1 or 1, buffer: &lt;00 FF 00 00 00&gt;}</dd>
                     <br>
-                    <dd>cmd: BTN_#, value: boolean</dd>
+                    <dd>{cmd: JOG, value: -7 to 7, buffer: &lt;FF 00 00 00 00&gt;}</dd>
                 </dl>
             </li>
         </ol>
 
-    <h3>Details</h3>
-        <p>For the 'JOG' cmd, it will return integer values between -7 and 7 where 0 is the resting state of the jog dial, negative values are CCW and positive values are CW on the jog dial.</p>
+    <h3>Output Details</h3>
+        <p>'BTN_#' - returns true for button pressed, false for button released.</p>
         <br>
-        <p>For the 'INCREMENT' cmd, it will return either -1 or +1 to reflect CCW (negative) or CW (positive) direction of the increment dial.</p>
+        <p>'MPG' - returns either -1 or +1 to reflect CCW (negative) or CW (positive) direction of the MPG (Manual Pulse Generator) dial.</p>
         <br>
-        <p>For the 'BTN_1 through BTN_5' cmd, it will return true for button pressed and false for button released.</p>
+        <p>'JOG - returns integer values between -7 and 7 where 0 is the resting state of the jog dial, negative values are CCW and positive values are CW on the jog dial.</p>
 
-</script>
-
-
-<script type="text/javascript">
-  RED.nodes.registerType("DeviceInfo", {
-    category: "ShuttleXpress",
-    color: "#dce0d9",
-    defaults: {
-      name: {value: ""}            
-    },
-    button: {
-        onclick: function() {
-            const node = this;
-            $.ajax({
-                url: "inject/"+this.id,
-                type:"POST",
-                success: function(resp) {
-                    RED.notify(node._("inject.success",{label:label}),{type:"success",id:"inject"});
-                },
-                error: function(jqXHR,textStatus,errorThrown) {
-                    if (jqXHR.status == 404) {
-                        RED.notify(node._("common.notification.error",{message:node._("common.notification.errors.not-deployed")}),"error");
-                    } else if (jqXHR.status == 500) {
-                        RED.notify(node._("common.notification.error",{message:node._("inject.errors.failed")}),"error");
-                    } else if (jqXHR.status == 0) {
-                        RED.notify(node._("common.notification.error",{message:node._("common.notification.errors.no-response")}),"error");
-                    } else {
-                        RED.notify(node._("common.notification.error",{message:node._("common.notification.errors.unexpected",{status:jqXHR.status,message:textStatus})}),"error");
-                    }
-                }
-            });
-        }
-    },
-    inputs: 0,
-    outputs: 1,
-    icon: "shuttlexpress.png",
-    label: function() {
-      return this.name || "DeviceInfo";
-    }
-  });
-</script>
-
-<script type="text/html" data-template-name="DeviceInfo">
-  <div class="form-row">
-    <label for="node-input-name"><i class="icon-tag"></i> Name </label>
-    <input type="text" id="node-input-name" placeholder="Name">
-  </div>
-</script>
-
-<script type="text/html" data-help-name="DeviceInfo">
-  <p>A node that lists the connected ShuttleXpress HID Device Info and returns it as msg.payload</p>
 </script>

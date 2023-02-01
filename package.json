@@ -1,7 +1,7 @@
 {
-  "name": "node-red-contrib-shuttlexpress",
-  "version": "0.0.2",
-  "description": "Node-RED nodes for the ShuttleXpress input device, built around node-hid",
+  "name": "@legacymachine/node-red-contrib-shuttlexpress",
+  "version": "0.0.1",
+  "description": "Node-RED node for the Contour Design ShuttleXpress input device, built around 'node-hid' and 'usb-detection'",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/legacymachine/node-red-contrib-shuttlexpress.git"
@@ -13,9 +13,11 @@
     "usbhid",
     "usb-hid",
     "node-hid",
-    "usb"
+    "usb",
+    "cnc",
+    "mpg"
   ],
-  "author": "Josh Dudley <jadudley03@gmail.com>",
+  "author": "Josh Dudley <josh@legacymachineworks.com>",
   "license": "MIT License",
   "bugs": {
     "url": "https://github.com/legacymachine/node-red-contrib-shuttlexpress/issues"
@@ -26,6 +28,7 @@
     "usb-detection": "^4.14.1"
   },
   "node-red": {
+    "vesrion": ">=2.0.0",
     "nodes": {
       "shuttlexpress": "shuttlexpress/shuttlexpress.js"
     }
