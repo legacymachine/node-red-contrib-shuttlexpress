@@ -62,7 +62,7 @@ module.exports = function(RED) {
     }
 
 
-    function connectShuttleXpress(VID, PID) {
+    function connectShuttleXpress(VID, PID, node) {
 
         let connection = {
             connected: false,
@@ -71,7 +71,7 @@ module.exports = function(RED) {
 
         try {
 
-            const shuttleXpress = new HID.HID(VID, PID, node);
+            const shuttleXpress = new HID.HID(VID, PID);
 
             let dataPrevious = Buffer.alloc(5).toJSON().data;
 
