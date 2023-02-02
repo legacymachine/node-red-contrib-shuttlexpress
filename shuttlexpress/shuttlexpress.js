@@ -17,7 +17,7 @@ module.exports = function(RED) {
         usbDetect.startMonitoring();
 
         usbDetect.on(`add:${VID}:${PID}`, function(device) {
-            const connection = connectShuttleXpress(VID, PID);
+            const connection = connectShuttleXpress(VID, PID, node);
             if (connection.connected) {
                 node.log("ShuttleXpress device connected to Node-RED");
                 node.status({
@@ -71,7 +71,7 @@ module.exports = function(RED) {
 
         try {
 
-            const shuttleXpress = new HID.HID(VID, PID);
+            const shuttleXpress = new HID.HID(VID, PID, node);
 
             let dataPrevious = Buffer.alloc(5).toJSON().data;
 

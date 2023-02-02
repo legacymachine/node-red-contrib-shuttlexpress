@@ -2,6 +2,8 @@
 
 Node-RED node for Contour Design's USB ShuttleXpress input device, built around [node-hid](https://github.com/node-hid/node-hid) and [usb-detection](https://github.com/MadLittleMods/node-usb-detection).
 
+This node was created as a physical control option for a [Grbl](https://www.grbl.org/) based CNC controlled machine but can be used generically for other user defined needs.
+
 ## Install
 
 Either use the Editor -> Menu -> Manage Palette -> Install option, or run the following command in your Node-RED user directory (typically ~/.node-red).
@@ -17,8 +19,6 @@ npm install @legacymachine/node-red-contrib-shuttlexpress
 ## Usage
 
 This node parses the output buffer data from a Contour Design ShuttleXpress device. The parsed buffer data is output to `msg.payload` as an object containing `cmd`, `value` and `buffer` properties. The `buffer` property is the raw buffer from the ShuttleXpress device that can be easily parsed using the [node-red-contrib-buffer-parser](https://flows.nodered.org/node/node-red-contrib-buffer-parser) node. If a device error occurs, it will be handled using node.error().
-
-This node was created as a physical control option for a [Grbl](https://www.grbl.org/) based CNC controlled machine.
 
 ### Output
 
