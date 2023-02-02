@@ -17,19 +17,32 @@ module.exports = function(RED) {
         usbDetect.startMonitoring();
 
         usbDetect.on(`add:${VID}:${PID}`, function(device) {
-            connectShuttleXpress(node, VID, PID);
+            const connection = connectShuttleXpress(VID, PID);
+            if (connection.connected) {
+                node.log("ShuttleXpress device connected to Node-RED");
+                node.status({
+                    fill: "green",
+                    shape: "dot",
+                    text: "connected"
+                });
+            } else {
+                node.log("ShuttleXpress device failed to connect to Node-RED");
+                node.error(connection.err);
+                node.status({
+                    fill: "red",
+                    shape: "ring",
+                    text: "disconnected"
+                });
+            }
         });
 
         usbDetect.on(`remove:${VID}:${PID}`, function(device) {
-
-            node.log("ShuttleXpress node-hid device disconnected from Node-RED");
-
+            node.log("ShuttleXpress device disconnected from Node-RED");
             node.status({
                 fill: "red",
                 shape: "ring",
                 text: "disconnected"
             });
-
         });
 
         usbDetect.find(VID, PID, function(err, devices) { 
@@ -37,7 +50,7 @@ module.exports = function(RED) {
             if (device) {
                 usbDetect.emit(`add:${VID}:${PID}`, device);
             } else {
-                node.log("ShuttleXpress node-hid device not found");
+                node.log("ShuttleXpress device not found");
                 node.status({
                     fill: "red",
                     shape: "ring",
@@ -49,7 +62,12 @@ module.exports = function(RED) {
     }
 
 
-    function connectShuttleXpress(node, VID, PID) {
+    function connectShuttleXpress(VID, PID) {
+
+        let connection = {
+            connected: false,
+            err: null
+        };
 
         try {
 
@@ -87,26 +105,14 @@ module.exports = function(RED) {
                 node.error(err, msg);
             });
 
-            node.log("ShuttleXpress node-hid device connected to Node-RED");
-
-            node.status({
-                fill: "green",
-                shape: "dot",
-                text: "connected"
-            });
+            // update connected property to true
+            connection.connected = true;
 
         } catch (err) {
-
-            node.error(err);
-
-            node.log("ShuttleXpress node-hid device failed to connect to Node-RED");
-
-            node.status({
-                fill: "red",
-                shape: "ring",
-                text: "disconnected"
-            });
-
+            // update err property with error message
+            connection.err = err;
+        } finally {
+            return connection;
         }
 
     };
