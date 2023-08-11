@@ -42,6 +42,13 @@ This node parses the output buffer data from a Contour Design ShuttleXpress devi
 
 ## Linux Notes
 
+### Install the libraries as shown below
+
+```bash
+sudo apt install libudev-dev
+sudo apt install libusb-1.0-0 libusb-1.0-0-dev
+```
+
 Visit the [node-hid](https://github.com/node-hid/node-hid#readme) repository on GitHub for information on setup, and the prerequisites for various platforms (especially Linux) to get the node installed and working.
 
 ### udev device permissions
@@ -61,6 +68,8 @@ KERNEL=="hidraw*", ATTRS{idVendor}=="0b33", ATTRS{idProduct}=="0020", MODE="0666
 Note that the values for vendorId and productId must be in hex and lower-case.
 
 Save this file as `/etc/udev/rules.d/ShuttleXpress.rules`, unplug the HID device, and reload the rules with:
+
+**Note: `ShuttleXpress.rules` File is included in GitHub repository
 
 ```bash
 sudo udevadm control --reload-rules
