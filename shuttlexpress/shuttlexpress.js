@@ -59,6 +59,15 @@ module.exports = function(RED) {
             }
         });
 
+        node.on('close', function() {
+            try {
+               node.log('Stop monitoring usb-detect');
+               usbDetect.stopMonitoring();
+            } catch(err) {
+               node.error(err);
+            }
+        });
+
     }
 
 
@@ -107,6 +116,15 @@ module.exports = function(RED) {
 
             // update connected property to true
             connection.connected = true;
+
+            node.on('close', function() {
+                try {
+                   node.log('Shutting down ShuttleXpress device');
+                   shuttleXpress.close();
+                } catch(err) {
+                   node.error(err);
+                }
+            });
 
         } catch (err) {
             // update err property with error message
