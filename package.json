@@ -1,6 +1,6 @@
 {
   "name": "@legacymachine/node-red-contrib-shuttlexpress",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Node-RED node for the Contour Design ShuttleXpress input device, built around 'shuttle-control-usb' which uses 'node-hid' and 'usb'",
   "repository": {
     "type": "git",

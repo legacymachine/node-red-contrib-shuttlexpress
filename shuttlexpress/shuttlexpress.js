@@ -1,6 +1,6 @@
 module.exports = function(RED) {
 
-    const shuttleXpress = require("shuttle-control-usb");
+    const shuttle = require("shuttle-control-usb");
 
     function ShuttleXpressNode(config) {
 
@@ -8,44 +8,58 @@ module.exports = function(RED) {
 
         const node = this;
 
-        // vendorID and productID for Contour Design ShuttleXpress device
+        // vendorID for Contour Design Shuttle Devices (ShuttlePro v1, ShuttleXpress, ShuttlePro v2)
         //const VID = 0x0b33; // 2867
+
+        // productID for ShuttlePro v1
+        //const PID = 0x0010; // 16
+
+        // productID for ShuttleXpress
         //const PID = 0x0020; // 32
 
-        let ShuttleXpressID = null;
+        // productID for huttlePro v2
+        //const PID = 0x0030; // 48
 
-        // ShuttleXpress 'connected' event
-        shuttleXpress.on("connected", (device) => {
-            //const devices = shuttleXpress.getDeviceList();
+        let ShuttleID = null;
+        let ShuttleName = "";
+
+        // Shuttle 'connected' event
+        shuttle.on("connected", (device) => {
+
+            //const devices = shuttle.getDeviceList();
             //node.log(JSON.stringify(devices));
-            if (device.name === "ShuttleXpress") {
-                if (!ShuttleXpressID) ShuttleXpressID = device.id;
-                if (device.id === ShuttleXpressID) {
-                    node.log(`ShuttleXpress device [${device.id}] connected to Node-RED`);
+
+            // Assign first ID & Name to prevent multiple connections to one device
+            if (!ShuttleID) ShuttleID = device.id;
+            if (!ShuttleName) ShuttleName = device.name;
+
+            if (device.id === ShuttleID) {
+                node.log(`${ShuttleName} device [${device.id}] connected to Node-RED`);
                 node.status({
                     fill: "green",
                     shape: "dot",
-                    text: "connected"
+                    text: `connected: ${ShuttleName}`
                 });
-                }
             }
+
         });
 
-        // ShuttleXpress 'disconnected' event
-        shuttleXpress.on("disconnected", (id) => {
-            node.log(`ShuttleXpress device [${id}] disconnected from Node-RED`);
+        // Shuttle 'disconnected' event
+        shuttle.on("disconnected", (id) => {
+            node.log(`${ShuttleName} device [${id}] disconnected from Node-RED`);
             node.status({
                 fill: "red",
                 shape: "dot",
                 text: "disconnected"
             });
-            ShuttleXpressID = null;
+            ShuttleID = null;
+            ShuttleName = "";
         });
 
-        // ShuttleXpress JOG (shuttle dial)
-        shuttleXpress.on("shuttle", (value, id) => {
-            if (id === ShuttleXpressID) {
-                node.log(`ShuttleXpress [JOG: ${value}]`);
+        // Shuttle JOG (shuttle dial)
+        shuttle.on("shuttle", (value, id) => {
+            if (id === ShuttleID) {
+                node.log(`${ShuttleName} [JOG: ${value}]`);
                 const msg = {
                     payload: {
                         id: id,
@@ -57,10 +71,28 @@ module.exports = function(RED) {
             }
         });
 
-        // ShuttleXpress MPG (incremental dial)
-        shuttleXpress.on("jog-dir", (value, id) => {
-            if (id === ShuttleXpressID) {
-                node.log(`ShuttleXpress [MPG: ${value}]`);
+        // Shuttle JOG-TRANSITION (shuttle dial previous)
+        shuttle.on("shuttle-trans", (previous, current, id) => {
+            if (id === ShuttleID) {
+                node.log(`${ShuttleName} [JOG-TRANSITION: ${current}, ${previous}]`);
+                const msg = {
+                    payload: {
+                        id: id,
+                        cmd: "JOG-TRANSITION",
+                        value: {
+                            current: current,
+                            previous: previous
+                        }
+                    }
+                };
+                node.send(msg);
+            }
+        });
+
+        // Shuttle MPG (incremental dial direction)
+        shuttle.on("jog-dir", (value, id) => {
+            if (id === ShuttleID) {
+                node.log(`${ShuttleName} [MPG: ${value}]`);
                 const msg = {
                     payload: {
                         id: id,
@@ -72,10 +104,25 @@ module.exports = function(RED) {
             }
         });
 
-        // ShuttleXpress BTN DOWN (button #)
-        shuttleXpress.on("buttondown", (value, id) => {
-            if (id === ShuttleXpressID) {
-                node.log(`ShuttleXpress [BTN_${value}: true]`);
+        // Shuttle MPG-POSITION (incremental dial position)
+        shuttle.on("jog", (value, id) => {
+            if (id === ShuttleID) {
+                node.log(`${ShuttleName} [MPG-POSITION: ${value}]`);
+                const msg = {
+                    payload: {
+                        id: id,
+                        cmd: "MPG-POSITION",
+                        value: value
+                    }
+                };
+                node.send(msg);
+            }
+        });
+
+        // Shuttle BTN DOWN (button #)
+        shuttle.on("buttondown", (value, id) => {
+            if (id === ShuttleID) {
+                node.log(`${ShuttleName} [BTN_${value}: true]`);
                 const msg = {
                     payload: {
                         id: id,
@@ -87,10 +134,10 @@ module.exports = function(RED) {
             }
         });
 
-        // ShuttleXpress BTN UP (button #)
-        shuttleXpress.on("buttonup", (value, id) => {
-            if (id === ShuttleXpressID) {
-                node.log(`ShuttleXpress [BTN_${value}: false]`);
+        // Shuttle BTN UP (button #)
+        shuttle.on("buttonup", (value, id) => {
+            if (id === ShuttleID) {
+                node.log(`${ShuttleName} [BTN_${value}: false]`);
                 const msg = {
                     payload: {
                         id: id,
@@ -102,19 +149,19 @@ module.exports = function(RED) {
             }
         });
 
-        // Stop ShuttleExpress device on node close
+        // Stop Shuttle device on node close
         node.on("close", () => {
             try {
-               node.log('Stop ShuttleXpress device');
-               shuttleXpress.stop();
+               node.log(`Stop ${ShuttleName} device`);
+               shuttle.stop();
             } catch(err) {
                node.error(err);
-               shuttleXpress.stop();
+               shuttle.stop();
             }
         });
 
-        // Start ShuttleXpress Device
-        shuttleXpress.start();
+        // Start Shuttle Device
+        shuttle.start();
 
     }
 
